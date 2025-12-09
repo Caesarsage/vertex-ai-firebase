@@ -1,0 +1,262 @@
+import { firebaseConfig } from "./firebaseConfig.js";
+
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+
+// Configuration
+// const FUNCTIONS_URL =
+//  "https://us-central1-new-ai-caesar.cloudfunctions.net";
+const FUNCTIONS_URL = "http://127.0.0.1:5001/new-ai-caesar/us-central1"; // Local
+
+let conversationHistory = [];
+let currentUser = null;
+let currentConversationId = null;
+
+// Load conversation from localStorage on page load
+function loadSavedConversation() {
+  const saved = localStorage.getItem("currentConversation");
+  if (saved) {
+    try {
+      const data = JSON.parse(saved);
+      conversationHistory = data.history || [];
+      currentConversationId = data.id || null;
+
+      // Restore messages
+      conversationHistory.forEach((msg) => {
+        if (msg.role === "user") {
+          addMessage(msg.parts[0].text, true);
+        } else if (msg.role === "model") {
+          addMessage(msg.parts[0].text, false);
+        }
+      });
+    } catch (e) {
+      console.error("Failed to load conversation:", e);
+    }
+  }
+}
+
+// Save conversation to localStorage
+function saveConversation() {
+  if (conversationHistory.length > 0) {
+    localStorage.setItem(
+      "currentConversation",
+      JSON.stringify({
+        id: currentConversationId,
+        history: conversationHistory,
+      })
+    );
+  }
+}
+
+// Clear conversation
+function clearConversation() {
+  conversationHistory = [];
+  currentConversationId = null;
+  messagesContainer.innerHTML = "";
+  localStorage.removeItem("currentConversation");
+  addMessage("Hello! I'm your AI assistant. How can I help you today?", false);
+}
+
+// DOM Elements
+const authSection = document.getElementById("auth-section");
+const app = document.getElementById("app");
+const loginBtn = document.getElementById("login-btn");
+const logoutBtn = document.getElementById("logout-btn");
+const newChatBtn = document.getElementById("new-chat-btn");
+const userEmail = document.getElementById("user-email");
+const chatModeBtn = document.getElementById("chat-mode-btn");
+const promptInput = document.getElementById("prompt");
+const sendBtn = document.getElementById("send-btn");
+const messagesContainer = document.getElementById("messages");
+const loadingDiv = document.getElementById("loading");
+const loadingText = document.getElementById("loading-text");
+const errorDiv = document.getElementById("error");
+
+// Auth State Observer
+auth.onAuthStateChanged((user) => {
+  if (user) {
+    currentUser = user;
+    authSection.classList.add("hidden");
+    app.classList.remove("hidden");
+    userEmail.textContent = user.email;
+
+    // Load saved conversation or show welcome message
+    if (conversationHistory.length === 0) {
+      loadSavedConversation();
+      if (conversationHistory.length === 0) {
+        addMessage(
+          "Hello! I'm your AI assistant. How can I help you today?",
+          false
+        );
+      }
+    }
+  } else {
+    currentUser = null;
+    authSection.classList.remove("hidden");
+    app.classList.add("hidden");
+  }
+});
+
+// Login
+loginBtn.addEventListener("click", async () => {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  try {
+    await auth.signInWithPopup(provider);
+  } catch (error) {
+    showError("Login failed: " + error.message);
+  }
+});
+
+// Logout
+logoutBtn.addEventListener("click", () => {
+  if (confirm("Sign out? Your current conversation will be saved.")) {
+    saveConversation();
+    auth.signOut();
+  }
+});
+
+// New Chat
+newChatBtn.addEventListener("click", () => {
+  if (confirm("Start a new chat? Current conversation will be saved.")) {
+    saveConversation();
+    clearConversation();
+  }
+});
+
+// Mode Toggle
+chatModeBtn.addEventListener("click", () => {
+  chatModeBtn.classList.add("active");
+  imageModeBtn.classList.remove("active");
+  imageControls.classList.remove("active");
+  promptInput.placeholder = "Ask me anything...";
+});
+
+// Simple markdown to HTML converter
+function formatMarkdown(text) {
+  return (
+    text
+      // Bold
+      .replaceAll(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      // Italic
+      .replaceAll(/\*(.+?)\*/g, "<em>$1</em>")
+      // Code blocks
+      .replaceAll(/```(\w+)?\n([\s\S]+?)```/g, "<pre><code>$2</code></pre>")
+      // Inline code
+      .replaceAll(/`(.+?)`/g, "<code>$1</code>")
+      // Links
+      .replaceAll(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank">$1</a>')
+      // Line breaks
+      .replaceAll(/\n/g, "<br>")
+  );
+}
+
+// Add message to chat
+function addMessage(text, isUser, imageData = null) {
+  const messageDiv = document.createElement("div");
+  messageDiv.className = `message ${isUser ? "user-message" : "ai-message"}`;
+
+  if (imageData) {
+    messageDiv.classList.add("image-message");
+    const img = document.createElement("img");
+    img.src = `data:${imageData.mimeType};base64,${imageData.data}`;
+    img.alt = "Generated image";
+    messageDiv.appendChild(img);
+  } else {
+    if (isUser) {
+      messageDiv.textContent = text;
+    } else {
+      messageDiv.innerHTML = formatMarkdown(text);
+    }
+  }
+
+  messagesContainer.appendChild(messageDiv);
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+// Show error
+function showError(message) {
+  errorDiv.textContent = message;
+  errorDiv.classList.remove("hidden");
+  setTimeout(() => {
+    errorDiv.classList.add("hidden");
+  }, 5000);
+}
+
+// Get auth token
+async function getAuthToken() {
+  if (!currentUser) return null;
+  return await currentUser.getIdToken();
+}
+
+// Send message
+async function sendMessage() {
+  const message = promptInput.value.trim();
+  if (!message) return;
+
+  sendBtn.disabled = true;
+  promptInput.disabled = true;
+  loadingDiv.classList.remove("hidden");
+  errorDiv.classList.add("hidden");
+
+  addMessage(message, true);
+  promptInput.value = "";
+
+  try {
+    const token = await getAuthToken();
+    if (!token) {
+      throw new Error("Not authenticated");
+    }
+
+    loadingText.textContent = "Thinking...";
+    await sendChatMessage(message, token);
+  } catch (error) {
+    console.error("Error:", error);
+    showError(error.message || "Request failed. Please try again.");
+  } finally {
+    sendBtn.disabled = false;
+    promptInput.disabled = false;
+    loadingDiv.classList.add("hidden");
+    promptInput.focus();
+  }
+}
+
+// Send chat message
+async function sendChatMessage(message, token) {
+  const response = await fetch(`${FUNCTIONS_URL}/chat`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      message: message,
+      history: conversationHistory,
+      conversationId: currentConversationId,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Chat request failed");
+  }
+
+  if (data.success) {
+    addMessage(data.text, false);
+    conversationHistory = data.history;
+    currentConversationId = data.conversationId;
+    saveConversation(); // Save after each message
+  } else {
+    throw new Error(data.error);
+  }
+}
+
+// Event listeners
+sendBtn.addEventListener("click", sendMessage);
+promptInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});

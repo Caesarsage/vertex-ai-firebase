@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Chat with Vertex AI</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>🤖 AI Assistant</h1>
+      <p class="subtitle">Powered by Vertex AI & Firebase</p>
+
+      <!-- Auth Section -->
+      <div id="auth-section" class="auth-section">
+        <button id="login-btn">Sign in with Google</button>
+      </div>
+
+      <!-- Main App (hidden until authenticated) -->
+      <div id="app" class="hidden">
+        <!-- User Info -->
+        <div class="user-info">
+          <span id="user-email"></span>
+          <div style="display: flex; gap: 8px">
+            <button id="new-chat-btn" style="background: #28a745">
+              New Chat
+            </button>
+            <button id="logout-btn">Sign Out</button>
+          </div>
+        </div>
+
+        <!-- Chat Container -->
+        <div id="chat-container">
+          <div id="messages"></div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="input-area">
+          <textarea
+            id="prompt"
+            placeholder="Ask me anything..."
+            rows="3"
+          ></textarea>
+          <button id="send-btn">Send</button>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="loading" class="loading hidden">
+          <div class="spinner"></div>
+          <span id="loading-text">Thinking...</span>
+        </div>
+
+        <!-- Error Display -->
+        <div id="error" class="error hidden"></div>
+      </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+
+    <script src="app.js"></script>
+  </body>
+</html>
