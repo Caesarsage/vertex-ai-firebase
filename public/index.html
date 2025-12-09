@@ -25,6 +25,7 @@
             <button id="new-chat-btn" style="background: #28a745">
               New Chat
             </button>
+            <button id="load-convos-btn">Load Conversations</button>
             <button id="logout-btn">Sign Out</button>
           </div>
         </div>
@@ -52,6 +53,17 @@
 
         <!-- Error Display -->
         <div id="error" class="error hidden"></div>
+      </div>
+    </div>
+
+    <!-- Conversations Panel -->
+    <div id="conversations-panel" class="conversations-panel hidden">
+      <div class="conversations-header">
+        <h3>Previous Conversations</h3>
+        <button id="close-convos-btn">Close</button>
+      </div>
+      <div id="conversations-list" class="conversations-list">
+        <!-- Filled dynamically -->
       </div>
     </div>
 

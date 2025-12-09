@@ -64,6 +64,7 @@ const app = document.getElementById("app");
 const loginBtn = document.getElementById("login-btn");
 const logoutBtn = document.getElementById("logout-btn");
 const newChatBtn = document.getElementById("new-chat-btn");
+const loadConvosBtn = document.getElementById("load-convos-btn");
 const userEmail = document.getElementById("user-email");
 const chatModeBtn = document.getElementById("chat-mode-btn");
 const promptInput = document.getElementById("prompt");
@@ -72,6 +73,9 @@ const messagesContainer = document.getElementById("messages");
 const loadingDiv = document.getElementById("loading");
 const loadingText = document.getElementById("loading-text");
 const errorDiv = document.getElementById("error");
+const convPanel = document.getElementById("conversations-panel");
+const convList = document.getElementById("conversations-list");
+const closeConvBtn = document.getElementById("close-convos-btn");
 
 // Auth State Observer
 auth.onAuthStateChanged((user) => {
@@ -98,6 +102,119 @@ auth.onAuthStateChanged((user) => {
   }
 });
 
+// --- Conversations UI & logic ---
+function openConversationsPanel() {
+  convPanel.classList.remove("hidden");
+  loadConversations();
+}
+
+function closeConversationsPanel() {
+  convPanel.classList.add("hidden");
+}
+
+async function loadConversations() {
+  convList.innerHTML = "<p>Loading...</p>";
+  try {
+    const token = await getAuthToken();
+    if (!token) throw new Error("Not authenticated");
+
+    const res = await fetch(`${FUNCTIONS_URL}/listConversations`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Failed to load conversations");
+
+    if (!data.conversations || data.conversations.length === 0) {
+      convList.innerHTML = "<p>No conversations found.</p>";
+      return;
+    }
+
+    convList.innerHTML = "";
+    data.conversations.forEach((c) => {
+      const item = document.createElement("div");
+      item.className = "conversation-item";
+      item.innerHTML = `
+          <div class="conv-main">
+            <div class="conv-text">
+              <strong>${escapeHtml(c.lastMessage || "(no message)")}</strong>
+              <div class="conv-sub">${new Date(
+                c.updatedAt
+              ).toLocaleString()}</div>
+            </div>
+            <div class="conv-actions">
+              <button data-id="${c.id}" class="load-conv-btn">Load</button>
+            </div>
+          </div>`;
+      convList.appendChild(item);
+    });
+
+    // Attach listeners
+    convList.querySelectorAll(".load-conv-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        const id = e.target.dataset.id;
+        if (id) loadConversationById(id);
+      });
+    });
+  } catch (err) {
+    convList.innerHTML = "<p>Error loading conversations.</p>";
+    console.error(err);
+  }
+}
+
+async function loadConversationById(id) {
+  try {
+    const token = await getAuthToken();
+    if (!token) throw new Error("Not authenticated");
+
+    const res = await fetch(
+      `${FUNCTIONS_URL}/getConversation?id=${encodeURIComponent(id)}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Failed to load conversation");
+
+    if (data.success && data.conversation) {
+      // Replace local conversation with loaded one
+      conversationHistory = data.conversation.history || [];
+      currentConversationId = id;
+
+      // Render messages
+      messagesContainer.innerHTML = "";
+      conversationHistory.forEach((msg) => {
+        if (msg.role === "user") addMessage(msg.parts?.[0]?.text || "", true);
+        else addMessage(msg.parts?.[0]?.text || "", false);
+      });
+
+      saveConversation();
+      closeConversationsPanel();
+    } else {
+      throw new Error(data.error || "Conversation not found");
+    }
+  } catch (err) {
+    showError(err.message || "Failed to load conversation");
+    console.error(err);
+  }
+}
+
+function escapeHtml(unsafe) {
+  return String(unsafe)
+    .replaceAll('&', "&amp;")
+    .replaceAll(/</g, "&lt;")
+    .replaceAll(/>/g, "&gt;")
+    .replaceAll(/\"/g, "&quot;")
+    .replaceAll(/'/g, "&#039;");
+}
+
 // Login
 loginBtn.addEventListener("click", async () => {
   const provider = new firebase.auth.GoogleAuthProvider();
@@ -123,6 +240,12 @@ newChatBtn.addEventListener("click", () => {
     clearConversation();
   }
 });
+
+// Open conversations panel
+if (loadConvosBtn)
+  loadConvosBtn.addEventListener("click", openConversationsPanel);
+if (closeConvBtn)
+  closeConvBtn.addEventListener("click", closeConversationsPanel);
 
 // Mode Toggle
 chatModeBtn.addEventListener("click", () => {

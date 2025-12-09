@@ -3,16 +3,16 @@ import * as admin from "firebase-admin";
 import * as cors from "cors";
 import { VertexAI } from "@google-cloud/vertexai";
 
-// Initialize Firebase Admin
+// Initialize Firebase Admin and DB
 admin.initializeApp();
 const db = admin.firestore();
 
 const corsHandler = cors({ origin: true });
 
 // Initialize Vertex AI
-const project = "new-ai-caesar";
+const project = "new-ai-caesar";  // your GCP project ID
 const location = "us-central1";
-const model = "gemini-2.5-flash"; 
+const model = "gemini-2.5-flash";
 
 const vertexAI = new VertexAI({
   project: project,
@@ -84,7 +84,7 @@ async function verifyAuth(
 ): Promise<string | null> {
   const authHeader = req.headers.authorization;
 
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+  if (!authHeader?.startsWith("Bearer ")) {
     return null;
   }
 
