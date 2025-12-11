@@ -21,51 +21,6 @@ let conversationHistory = [];
 let currentUser = null;
 let currentConversationId = null;
 
-// Load conversation from localStorage on page load
-function loadSavedConversation() {
-  const saved = localStorage.getItem("currentConversation");
-  if (saved) {
-    try {
-      const data = JSON.parse(saved);
-      conversationHistory = data.history || [];
-      currentConversationId = data.id || null;
-
-      // Restore messages
-      conversationHistory.forEach((msg) => {
-        if (msg.role === "user") {
-          addMessage(msg.parts[0].text, true);
-        } else if (msg.role === "model") {
-          addMessage(msg.parts[0].text, false);
-        }
-      });
-    } catch (e) {
-      console.error("Failed to load conversation:", e);
-    }
-  }
-}
-
-// Save conversation to localStorage
-function saveConversation() {
-  if (conversationHistory.length > 0) {
-    localStorage.setItem(
-      "currentConversation",
-      JSON.stringify({
-        id: currentConversationId,
-        history: conversationHistory,
-      })
-    );
-  }
-}
-
-// Clear conversation
-function clearConversation() {
-  conversationHistory = [];
-  currentConversationId = null;
-  messagesContainer.innerHTML = "";
-  localStorage.removeItem("currentConversation");
-  addMessage("Hello! I'm your AI assistant. How can I help you today?", false);
-}
-
 // DOM Elements
 const authSection = document.getElementById("auth-section");
 const app = document.getElementById("app");
@@ -88,6 +43,14 @@ const closeConvBtn = document.getElementById("close-convos-btn");
 auth.onAuthStateChanged((user) => {
   if (user) {
     currentUser = user;
+
+    // ADD THESE LOGS
+    console.log("=== AUTH INFO ===");
+    console.log("Email:", user.email);
+    console.log("UID:", user.uid);
+    console.log("Display Name:", user.displayName);
+    console.log("=================");
+
     authSection.classList.add("hidden");
     app.classList.remove("hidden");
     userEmail.textContent = user.email;
@@ -109,6 +72,60 @@ auth.onAuthStateChanged((user) => {
   }
 });
 
+// Save conversation to localStorage with user ID
+function saveConversation() {
+  if (conversationHistory.length > 0 && currentUser) {
+    const key = `conversation_${currentUser.uid}`;
+    localStorage.setItem(
+      key,
+      JSON.stringify({
+        id: currentConversationId,
+        history: conversationHistory,
+      })
+    );
+  }
+}
+
+// Load conversation from localStorage for current user
+function loadSavedConversation() {
+  if (!currentUser) return;
+
+  const key = `conversation_${currentUser.uid}`;
+  const saved = localStorage.getItem(key);
+
+  if (saved) {
+    try {
+      const data = JSON.parse(saved);
+      conversationHistory = data.history || [];
+      currentConversationId = data.id || null;
+
+      // Restore messages
+      conversationHistory.forEach((msg) => {
+        if (msg.role === "user") {
+          addMessage(msg.parts[0].text, true);
+        } else if (msg.role === "model") {
+          addMessage(msg.parts[0].text, false);
+        }
+      });
+    } catch (e) {
+      console.error("Failed to load conversation:", e);
+    }
+  }
+}
+
+// Clear conversation for current user
+function clearConversation() {
+  conversationHistory = [];
+  currentConversationId = null;
+  messagesContainer.innerHTML = "";
+
+  if (currentUser) {
+    const key = `conversation_${currentUser.uid}`;
+    localStorage.removeItem(key);
+  }
+
+  addMessage("Hello! I'm your AI assistant. How can I help you today?", false);
+}
 // --- Conversations UI & logic ---
 function openConversationsPanel() {
   convPanel.classList.remove("hidden");
