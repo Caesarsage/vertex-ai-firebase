@@ -52,12 +52,6 @@ resource "google_project_service" "generativelanguage_api" {
   disable_on_destroy = false
 }
 
-resource "google_project_service" "storage_api" {
-  project            = var.project_id
-  service            = "storage.googleapis.com"
-  disable_on_destroy = false
-}
-
 resource "google_project_service" "iam_api" {
   project            = var.project_id
   service            = "iam.googleapis.com"
@@ -85,6 +79,49 @@ resource "google_project_service" "firebasehosting_api" {
   disable_on_destroy = false
 }
 
+resource "google_project_service" "cloudfunctions" {
+  project            = var.project_id
+  service            = "cloudfunctions.googleapis.com"
+  disable_on_destroy = false
+}
+
+resource "google_project_service" "cloudbuild" {
+  project            = var.project_id
+  service            = "cloudbuild.googleapis.com"
+  disable_on_destroy = false
+}
+
+resource "google_project_service" "artifactregistry" {
+  project            = var.project_id
+  service            = "artifactregistry.googleapis.com"
+  disable_on_destroy = false
+}
+
+resource "google_project_service" "cloudrun" {
+  project            = var.project_id
+  service            = "run.googleapis.com"
+  disable_on_destroy = false
+}
+
+resource "google_project_service" "eventarc" {
+  project            = var.project_id
+  service            = "eventarc.googleapis.com"
+  disable_on_destroy = false
+}
+
+resource "google_project_service" "pubsub" {
+  project            = var.project_id
+  service            = "pubsub.googleapis.com"
+  disable_on_destroy = false
+}
+
+resource "google_project_service" "storage" {
+  project            = var.project_id
+  service            = "storage.googleapis.com"
+  disable_on_destroy = false
+}
+
+
 # Enable Firebase
 resource "google_firebase_project" "default" {
   count      = var.enable_firebase ? 1 : 0
@@ -99,6 +136,37 @@ resource "google_firebase_web_app" "default" {
   project      = var.project_id
   display_name = "DevFest AI Web App"
   depends_on   = [google_firebase_project.default]
+}
+
+# Firestore Database
+resource "google_firestore_database" "database" {
+  project     = var.project_id
+  name        = "(default)"
+  location_id = var.region
+  type        = "FIRESTORE_NATIVE"
+
+  depends_on = [
+    google_project_service.firestore_api
+  ]
+}
+
+# Firestore Index for conversations query
+resource "google_firestore_index" "conversations_by_user_and_time" {
+  project    = var.project_id
+  database   = "(default)"
+  collection = "conversations"
+
+  fields {
+    field_path = "userId"
+    order      = "ASCENDING"
+  }
+
+  fields {
+    field_path = "updatedAt"
+    order      = "DESCENDING"
+  }
+
+  depends_on = [google_firestore_database.database]
 }
 
 # Service Account
@@ -117,13 +185,6 @@ resource "google_project_iam_member" "vertex_ai_role" {
   depends_on = [google_service_account.ai_demo_sa]
 }
 
-resource "google_project_iam_member" "storage_admin_role" {
-  project    = var.project_id
-  role       = "roles/storage.admin"
-  member     = "serviceAccount:${google_service_account.ai_demo_sa.email}"
-  depends_on = [google_service_account.ai_demo_sa]
-}
-
 resource "google_project_iam_member" "token_creator_role" {
   project    = var.project_id
   role       = "roles/iam.serviceAccountTokenCreator"
@@ -137,62 +198,4 @@ resource "google_project_iam_member" "firebase_admin_role" {
   role       = "roles/firebase.admin"
   member     = "serviceAccount:${google_service_account.ai_demo_sa.email}"
   depends_on = [google_service_account.ai_demo_sa]
-}
-
-# Service Account Key
-resource "google_service_account_key" "sa_key" {
-  service_account_id = google_service_account.ai_demo_sa.name
-  public_key_type    = "TYPE_X509_PEM_FILE"
-  private_key_type   = "TYPE_GOOGLE_CREDENTIALS_FILE"
-}
-
-resource "local_file" "sa_key_file" {
-  content         = base64decode(google_service_account_key.sa_key.private_key)
-  filename        = "${path.module}/sa-key.json"
-  file_permission = "0600"
-}
-
-# Outputs
-output "project_id" {
-  value = var.project_id
-}
-
-output "service_account_email" {
-  value = google_service_account.ai_demo_sa.email
-}
-
-output "bucket_name" {
-  value = google_storage_bucket.demo_bucket.name
-}
-
-output "sa_key_path" {
-  value = abspath(local_file.sa_key_file.filename)
-}
-
-output "firebase_enabled" {
-  value = var.enable_firebase
-}
-
-output "firebase_web_app_id" {
-  value = var.enable_firebase ? google_firebase_web_app.default[0].app_id : "Not enabled"
-}
-
-output "setup_instructions" {
-  value = <<-EOT
-
-    Infrastructure Setup Complete!
-
-    Project: ${var.project_id}
-    Service Account: ${google_service_account.ai_demo_sa.email}
-    Storage Bucket: ${google_storage_bucket.demo_bucket.name}
-
-    To use the service account in your app:
-    export GOOGLE_APPLICATION_CREDENTIALS="${abspath(local_file.sa_key_file.filename)}"
-
-    To update Firebase config:
-    cd .. && firebase use ${var.project_id}
-
-    To destroy:
-    terraform destroy
-  EOT
 }

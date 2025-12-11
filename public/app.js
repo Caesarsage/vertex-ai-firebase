@@ -1,13 +1,21 @@
-import { firebaseConfig } from "./firebaseConfig.js";
+const isLocal =
+  window.location.hostname === "localhost" ||
+  window.location.hostname === "127.0.0.1";
 
 // Initialize Firebase
 firebase.initializeApp(firebaseConfig);
+
 const auth = firebase.auth();
 
+if (isLocal) {
+  // Connect to emulator for local testing
+  auth.useEmulator("http://127.0.0.1:9099");
+}
+
 // Configuration
-// const FUNCTIONS_URL =
-//  "https://us-central1-new-ai-caesar.cloudfunctions.net";
-const FUNCTIONS_URL = "http://127.0.0.1:5001/new-ai-caesar/us-central1"; // Local
+const FUNCTIONS_URL = isLocal
+  ? "http://127.0.0.1:5001/devfest-chat-app/us-central1"
+  : "https://us-central1-devfest-chat-app.cloudfunctions.net";
 
 let conversationHistory = [];
 let currentUser = null;
@@ -66,7 +74,6 @@ const logoutBtn = document.getElementById("logout-btn");
 const newChatBtn = document.getElementById("new-chat-btn");
 const loadConvosBtn = document.getElementById("load-convos-btn");
 const userEmail = document.getElementById("user-email");
-const chatModeBtn = document.getElementById("chat-mode-btn");
 const promptInput = document.getElementById("prompt");
 const sendBtn = document.getElementById("send-btn");
 const messagesContainer = document.getElementById("messages");
@@ -208,7 +215,7 @@ async function loadConversationById(id) {
 
 function escapeHtml(unsafe) {
   return String(unsafe)
-    .replaceAll('&', "&amp;")
+    .replaceAll("&", "&amp;")
     .replaceAll(/</g, "&lt;")
     .replaceAll(/>/g, "&gt;")
     .replaceAll(/\"/g, "&quot;")
@@ -246,14 +253,6 @@ if (loadConvosBtn)
   loadConvosBtn.addEventListener("click", openConversationsPanel);
 if (closeConvBtn)
   closeConvBtn.addEventListener("click", closeConversationsPanel);
-
-// Mode Toggle
-chatModeBtn.addEventListener("click", () => {
-  chatModeBtn.classList.add("active");
-  imageModeBtn.classList.remove("active");
-  imageControls.classList.remove("active");
-  promptInput.placeholder = "Ask me anything...";
-});
 
 // Simple markdown to HTML converter
 function formatMarkdown(text) {

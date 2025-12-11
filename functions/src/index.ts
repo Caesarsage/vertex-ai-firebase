@@ -7,10 +7,10 @@ import { VertexAI } from "@google-cloud/vertexai";
 admin.initializeApp();
 const db = admin.firestore();
 
-const corsHandler = cors({ origin: true });
+const corsHandler = cors();
 
 // Initialize Vertex AI
-const project = "new-ai-caesar";  // your GCP project ID
+const project = "devfest-chat-app";  // your GCP project ID
 const location = "us-central1";
 const model = "gemini-2.5-flash";
 

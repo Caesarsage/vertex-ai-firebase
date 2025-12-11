@@ -134,11 +134,31 @@ gcloud config set project YOUR_PROJECT_ID
 
 # Verify it's set
 gcloud config get-value project
+
+# describe for more details
+gcloud projects describe YOUR_PROJECT_ID
 ```
 
 Replace `YOUR_PROJECT_ID` with your actual GCP project ID.
 
-#### Step 3: Enable Required APIs
+#### Step 3. Update your Application Default Credentials to match
+
+```bash
+gcloud auth application-default set-quota-project YOUR_PROJECT_ID
+```
+
+#### Step 4. Link billing account (REQUIRED)
+```bash
+gcloud billing accounts list
+```
+
+#### Step 5: Copy your billing account ID from the output, then:
+
+```bash
+gcloud billing projects link devfest-chat-app --billing-account=YOUR_BILLING_ACCOUNT_ID
+```
+
+#### Step 6: Enable Required APIs (Optional: Should be enabled from terraform but if not run these)
 
 ```bash
 gcloud services enable aiplatform.googleapis.com --project=YOUR_PROJECT_ID
@@ -147,7 +167,7 @@ gcloud services enable storage.googleapis.com --project=YOUR_PROJECT_ID
 gcloud services enable iam.googleapis.com --project=YOUR_PROJECT_ID
 ```
 
-#### Step 4: Initialize and Apply Terraform
+#### Step 7: Initialize and Apply Terraform
 
 ```bash
 cd infra/
@@ -182,8 +202,8 @@ When prompted, enter `yes` to confirm. This will:
 # Go back to project root
 cd ..
 
-# Add Firebase to your GCP project
-firebase projects:addfirebase YOUR_PROJECT_ID
+# Add Firebase to your GCP project (Optional: Already added from terraform)
+# firebase projects:addfirebase YOUR_PROJECT_ID
 
 # Set Firebase to use your project
 firebase use YOUR_PROJECT_ID
@@ -210,7 +230,7 @@ Then update `public/firebaseConfig.js` with the output.
 # 2. Select your project
 # 3. Go to Authentication → Sign-in method
 # 4. Enable "Google" provider
-# 5. Add authorized domains (localhost for testing, your domain for production)
+# 5. Add authorized domains (localhost and 127.0.0.1 for testing, your domain for production will be automatically added when you deploy)
 ```
 
 ### 3. Cloud Functions Setup
@@ -273,9 +293,6 @@ Run the Firebase emulator to test locally:
 # From project root
 firebase emulators:start
 
-# In another terminal, serve the frontend
-cd public/
-npx http-server .
 ```
 
 Then open http://localhost:8080 in your browser.
